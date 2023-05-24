@@ -1,9 +1,17 @@
+// access to elements
+
 const searchInput = document.getElementById("searchInput");
 const searchButton = document.getElementById("searchButton");
 const resultsContainer = document.getElementById("results");
 const paginationContainer = document.getElementById("pagination");
+const loader = document.getElementById("loader");
+
 let currentPage = 1;
 let totalPages = 0;
+
+/**
+ * Added two event listeners.  The reason I added a keyboard event listener was for user that preferred or need to use the keyboard.
+ */
 
 searchButton.addEventListener("click", searchBooks);
 searchInput.addEventListener("keypress", function (event) {
@@ -12,6 +20,7 @@ searchInput.addEventListener("keypress", function (event) {
   }
 });
 
+// clear search input field
 const clearSearchInput = () => {
   searchInput.value = "";
 };
@@ -23,61 +32,85 @@ function searchBooks() {
     return;
   }
 
+  // initated the page at 1
   currentPage = 1;
   fetchBooks(terms);
   clearSearchInput();
 }
 
-function fetchBooks(terms) {
+// using async with try catch for api coverage
+const fetchBooks = async function (terms) {
   const endpoint = `https://goodreads-server-express--dotdash.repl.co/search/${terms}`;
 
-  console.log(endpoint);
+  /**
+ * Request options but not needed:
+ * const requestOptions = {
+    method: 'GET',
+    headers: headers,
+    mode: 'cors',
+    cache: 'default'
+  };
+*/
 
-  fetch(endpoint)
-    .then((response) => response.json())
-    .then((data) => {
+  try {
+    let response;
+    //basic loading message
+    loader.innerHTML = "Loading Books...";
+    response = await fetch(endpoint);
+    paginationContainer.innerHTML = "";
+
+    if (response.status === 200) {
+      loader.innerHTML = "";
+      let data = await response.json();
       console.log(data);
-      displayResults(data.list);
-      updatePagination(data.total);
-    })
-    .catch((error) => {
-      console.error("Error:", error);
+      displayResults(data);
+      updatePagination(data);
+    } else
       resultsContainer.innerHTML = "An error occurred while fetching data.";
-    });
-}
+  } catch (error) {
+    console.error("Error:", error);
+  }
+};
 
-function displayResults(books) {
-  resultsContainer.innerHTML = "";
-
+const displayResults = (books) => {
   if (books.length === 0) {
-    resultsContainer.innerHTML = "No results found.";
+    resultsContainer.innerHTML = "No books found.";
     return;
   }
 
-  books.forEach((book) => {
+  // decided to dynamic create book elements
+
+  books.list.forEach((book) => {
     const bookElement = document.createElement("div");
     bookElement.classList.add("book");
 
-    const titleElement = document.createElement("div");
+    const titleElement = document.createElement("h4");
     titleElement.classList.add("book-title");
     titleElement.textContent = book.title;
 
-    const authorElement = document.createElement("div");
+    const authorElement = document.createElement("h5");
     authorElement.classList.add("book-author");
-    authorElement.textContent = book.author;
+    authorElement.textContent = book.authorName;
 
     bookElement.appendChild(titleElement);
     bookElement.appendChild(authorElement);
 
     resultsContainer.appendChild(bookElement);
   });
-}
+};
 
-function updatePagination(pagination) {
-  paginationContainer.innerHTML = totalPages;
+// Pagination needs some additonal work but this is basic start of the pagination.
 
-  currentPage = pagination.currentPage;
-  totalPages = pagination.total;
+const updatePagination = (pagination) => {
+  if (pagination.list.length !== 0) {
+    paginationContainer.innerHTML = `${pagination.list.length} books`;
+  }
+
+  /**
+   * default to 1 since api is returning array of only 20 items
+   *  Could do pagination.total if more element were returned.
+   */
+  totalPages = 1;
 
   const previousButton = createPaginationButton(
     "Previous",
@@ -95,18 +128,32 @@ function updatePagination(pagination) {
     currentPage < totalPages ? currentPage + 1 : totalPages
   );
   paginationContainer.appendChild(nextButton);
-}
+};
 
-function createPaginationButton(label, pageNumber) {
+const createPaginationButton = (label, pageNumber) => {
   const button = document.createElement("button");
   button.classList.add("pagination-button");
   button.textContent = label;
-  if (pageNumber === currentPage) {
-    button.classList.add("current-page");
-  }
+  console.log("page num: ", pageNumber);
+  console.log("current page num: ", currentPage);
+
   button.addEventListener("click", () => {
-    currentPage = pageNumber;
-    fetchBooks(searchInput.value);
+    /**
+     *  Added a Use Case:
+     * If no next or previous page, disable previous and next buttons.
+     *
+     * */
+    if (pageNumber === currentPage) {
+      button.classList.add("current-page");
+      button.classList.add("disabled");
+    } else {
+      button.classList.remove("disabled");
+      fetchBooks(searchInput.value);
+    }
   });
   return button;
-}
+};
+
+/**
+ * Next phrase would be unitand intergration testing.
+ */
